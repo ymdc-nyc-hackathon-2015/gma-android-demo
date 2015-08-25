@@ -1,5 +1,6 @@
 package nyc2015.ydmc.com.gma.activity.helper;
 
+import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -62,5 +63,27 @@ public class AdViewHolder {
 
     public void setAdNative(FlurryAdNative adNative) {
         this.adNative = adNative;
+    }
+
+    public void hideAd()
+    {
+        if(adImage != null) {
+            adImage.setVisibility(View.INVISIBLE);
+        }
+        if(adTitle != null) {
+            adTitle.setVisibility(View.INVISIBLE);
+        }
+        if(adSummary != null) {
+            adSummary.setVisibility(View.INVISIBLE);
+        }
+        if(publisher != null) {
+            publisher.setVisibility(View.INVISIBLE);
+        }
+        if(sponsoredImage != null) {
+            sponsoredImage.setVisibility(View.INVISIBLE);
+        }
+        if(adNative != null) {
+            adNative.destroy();
+        }
     }
 }

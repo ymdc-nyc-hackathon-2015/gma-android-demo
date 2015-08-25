@@ -4,7 +4,9 @@ import nyc2015.ydmc.com.gma.activity.helper.AdViewHolder;
 import nyc2015.ydmc.com.gma.activity.helper.MainActivitySwipeHandler;
 import nyc2015.ydmc.com.gma.ads.NativeAdFetcher;
 import nyc2015.ydmc.com.gma.constants.FlurryConstants;
+import nyc2015.ydmc.com.gma.data.ApplicationData;
 import nyc2015.ydmc.com.gma.input.gesture.OnSwipeTouchListener;
+import nyc2015.ydmc.com.gma.input.gesture.SwipeGestureHandler;
 import nyc2015.ydmc.com.gma.util.SystemUiHider;
 
 import android.annotation.TargetApi;
@@ -19,6 +21,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.flurry.android.FlurryAgent;
 import com.flurry.android.ads.FlurryAdErrorType;
@@ -29,6 +32,8 @@ import com.flurry.android.ads.FlurryAdNativeAsset;
 import com.flurry.android.ads.FlurryAdNativeListener;
 
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import nyc2015.ydmc.com.gma.R;
 
@@ -38,22 +43,19 @@ import nyc2015.ydmc.com.gma.R;
  *
  * @see SystemUiHider
  */
-public class MainActivity extends Activity {
+public class MainActivity extends Activity implements SwipeGestureHandler {
 
     NativeAdFetcher nativeAdFetcher = new NativeAdFetcher();
 
     private FlurryAdNative mFlurryAdNative = null;
 
-    private static final String kLogTag= MainActivity.class.getName();
+    private static final String kLogTag = MainActivity.class.getName();
 
     View adLayout;
 
     AdViewHolder adViewHolder = new AdViewHolder();
 
     private OnSwipeTouchListener swipeGestureListener;
-
-    private MainActivitySwipeHandler swipeHandler;
-
 
     public static final String AD_ASSET_HEADLINE = "headline";
     public static final String AD_ASSET_SUMMARY = "summary";
@@ -66,12 +68,12 @@ public class MainActivity extends Activity {
         //This method will be called when the ad has been received from the server
         @Override
         public void onFetched(FlurryAdNative adNative) {
-           parseAssets(adNative);
-            swipeHandler =new MainActivitySwipeHandler(MainActivity.this.getApplicationContext());
-            swipeGestureListener = new OnSwipeTouchListener(MainActivity.this, swipeHandler);
-            if(adViewHolder.getAdImage() != null)
-            {
-                adViewHolder.getAdImage().setOnTouchListener(swipeGestureListener);
+            parseAssets(adNative);
+            if (swipeGestureListener == null) {
+                swipeGestureListener = new OnSwipeTouchListener(MainActivity.this);
+                if (adViewHolder.getAdImage() != null) {
+                    adViewHolder.getAdImage().setOnTouchListener(swipeGestureListener);
+                }
             }
         }
 
@@ -93,7 +95,7 @@ public class MainActivity extends Activity {
         //This method will be called when the user dismisses the current Ad
         @Override
         public void onCloseFullscreen(FlurryAdNative adNative) {
-            Log.i(kLogTag, "onCloseFullscreen " );
+            Log.i(kLogTag, "onCloseFullscreen ");
         }
 
         //This method will be called when the user has clicked on the ad.
@@ -110,7 +112,8 @@ public class MainActivity extends Activity {
         //This method will be called when the user is leaving the application after following events associated with the current Ad .
         @Override
         public void onAppExit(FlurryAdNative adNative) {
-            Log.i(kLogTag, "onAppExit ");}
+            Log.i(kLogTag, "onAppExit ");
+        }
     };
 
     @Override
@@ -119,27 +122,21 @@ public class MainActivity extends Activity {
 
         setContentView(R.layout.activity_main);
 
-       // final View controlsView = findViewById(R.id.fullscreen_content_controls);
-         adLayout = (LinearLayout)findViewById(R.id.adContainerLayout);
+        // final View controlsView = findViewById(R.id.fullscreen_content_controls);
+        adLayout = (LinearLayout) findViewById(R.id.adContainerLayout);
 
         //if your application suports the device rotation, use the application context
         //when creating the native ad objects to prevent the object from
         //being destroyed with the Activity
 
-        mFlurryAdNative = new FlurryAdNative(this, FlurryConstants.FLURRY_STREAM_AD_CAMPAIGN);
-        // allow us to get callbacks for ad events
-        mFlurryAdNative.setListener(nativeListener);
-        //required to support ad tracking
-        mFlurryAdNative.setTrackingView(adLayout);
-        //nativeAdFetcher.prefetchAds(adLayout.getContext());
+       initFlurry();
 
-        adViewHolder.setAdImage((ImageView)findViewById(R.id.mainImage));
-       // adViewHolder.setAdSummary((TextView) findViewById(R.id.mainText));
-        adViewHolder.setAdTitle((TextView)findViewById(R.id.newsTitle));
-        adViewHolder.setAdSummary((TextView)findViewById(R.id.newsSummary));
+        adViewHolder.setAdImage((ImageView) findViewById(R.id.mainImage));
+        // adViewHolder.setAdSummary((TextView) findViewById(R.id.mainText));
+        adViewHolder.setAdTitle((TextView) findViewById(R.id.newsTitle));
+        adViewHolder.setAdSummary((TextView) findViewById(R.id.newsSummary));
 
     }
-
 
 
     public void onStart() {
@@ -162,9 +159,8 @@ public class MainActivity extends Activity {
         super.onDestroy();
     }
 
-    public void parseAssets(FlurryAdNative adNative)
-    {
-      loadAdInView(adViewHolder,adNative);
+    public void parseAssets(FlurryAdNative adNative) {
+        loadAdInView(adViewHolder, adNative);
 
     }
 
@@ -178,35 +174,58 @@ public class MainActivity extends Activity {
             FlurryAdNativeAsset adImageNativeAsset = adNative.getAsset(AD_ASSET_SEC_HQ_IMAGE);
 
             if (adHeadlineNativeAsset != null) {
+                if (viewHolder.getAdTitle() != null) {
+                    if (viewHolder.getAdTitle().getVisibility() == View.INVISIBLE) {
+                        viewHolder.getAdTitle().setVisibility(View.VISIBLE);
+                    }
+                }
                 adHeadlineNativeAsset.loadAssetIntoView(viewHolder.getAdTitle());
             } else {
-                viewHolder.getAdTitle().setVisibility(View.GONE);
+                viewHolder.getAdTitle().setVisibility(View.INVISIBLE);
             }
             if (adSummaryNativeAsset != null) {
+                if (viewHolder.getAdSummary() != null) {
+                    if (viewHolder.getAdSummary().getVisibility() == View.INVISIBLE) {
+                        viewHolder.getAdSummary().setVisibility(View.VISIBLE);
+                    }
+                }
                 adSummaryNativeAsset.loadAssetIntoView(viewHolder.getAdSummary());
             } else {
-                viewHolder.getAdSummary().setVisibility(View.GONE);
+                viewHolder.getAdSummary().setVisibility(View.INVISIBLE);
             }
 
             if (adPublhiserNativeAsset != null) {
+                if (viewHolder.getPublisher() != null) {
+                    if (viewHolder.getPublisher().getVisibility() == View.INVISIBLE) {
+                        viewHolder.getPublisher().setVisibility(View.VISIBLE);
+
+                    }
+                }
                 adPublhiserNativeAsset.loadAssetIntoView(viewHolder.getPublisher());
             } else {
-                viewHolder.getPublisher().setVisibility(View.GONE);
+                viewHolder.getPublisher().setVisibility(View.INVISIBLE);
             }
-
             if (adBrandingImageNativeAsset != null) {
+                if (viewHolder.getSponsoredImage() != null) {
+                    if (viewHolder.getSponsoredImage().getVisibility() == View.INVISIBLE) {
+                        viewHolder.getSponsoredImage().setVisibility(View.VISIBLE);
+                    }
+                }
                 adBrandingImageNativeAsset.loadAssetIntoView(viewHolder.getSponsoredImage());
-            } else
-            {
-                viewHolder.getSponsoredImage().setVisibility(View.GONE);
+            } else {
+                viewHolder.getSponsoredImage().setVisibility(View.INVISIBLE);
             }
 
 
             if (adImageNativeAsset != null) {
+                if (viewHolder.getAdImage() != null) {
+                    if (viewHolder.getAdImage().getVisibility() == View.INVISIBLE) {
+                        viewHolder.getAdImage().setVisibility(View.VISIBLE);
+                    }
+                }
                 adImageNativeAsset.loadAssetIntoView(viewHolder.getAdImage());
-            } else
-            {
-                viewHolder.getAdImage().setVisibility(View.GONE);
+            } else {
+                viewHolder.getAdImage().setVisibility(View.INVISIBLE);
             }
 
 
@@ -214,6 +233,62 @@ public class MainActivity extends Activity {
             Log.i(MainActivity.class.getName(), "Exception in fetching an Ad", e);
 
         }
+    }
+
+    @Override
+    public void swipedRight() {
+        this.adViewHolder.getAdTitle().performLongClick();//.performClick();
+    }
+
+    @Override
+    public void swipedDown() {
+        ApplicationData.getInstance().getDisguardedAds().add(this.adViewHolder.getAdTitle().getText().toString());
+        Toast.makeText(getBaseContext(), "Ad Disguarded " + this.adViewHolder.getAdTitle().getText().toString(), Toast.LENGTH_LONG).show();
+        this.handleAdNeedsToGo();
+
+    }
+
+    @Override
+    public void swipedUp() {
+
+            ApplicationData.getInstance().getSavedAds().add(this.adViewHolder.getAdTitle().getText().toString());;
+            Toast.makeText(getBaseContext(), "Ad Saved " + this.adViewHolder.getAdTitle().getText().toString(), Toast.LENGTH_LONG).show();
+            this.handleAdNeedsToGo();
+
+    }
+
+    @Override
+    public void swipedLeft() {
+
+        adViewHolder.hideAd();
+        this.handleAdNeedsToGo();
+    }
+
+    private void handleAdNeedsToGo()
+    {
+
+        MainActivity.this.mFlurryAdNative.destroy();
+        final Handler timerHandler = new Handler();
+        Runnable timerRunnable = new Runnable() {
+
+            @Override
+            public void run() {
+                initFlurry();
+                MainActivity.this.mFlurryAdNative.fetchAd();
+
+            }
+        };
+        timerHandler.postDelayed(timerRunnable, 2000);
+    }
+
+    private void initFlurry()
+    {
+
+        mFlurryAdNative = new FlurryAdNative(this, FlurryConstants.FLURRY_STREAM_AD_CAMPAIGN);
+        // allow us to get callbacks for ad events
+        mFlurryAdNative.setListener(nativeListener);
+        //required to support ad tracking
+        mFlurryAdNative.setTrackingView(adLayout);
     }
 }
 

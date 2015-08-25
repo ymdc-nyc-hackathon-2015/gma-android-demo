@@ -15,9 +15,16 @@ public class OnSwipeTouchListener implements OnTouchListener {
     private final GestureDetector gestureDetector;
     private SwipeGestureHandler swipeGestureHandler;
 
-    public OnSwipeTouchListener (Context ctx, SwipeGestureHandler swipeGesterHandler){
+    public OnSwipeTouchListener (Context ctx, Object... params){
         gestureDetector = new GestureDetector(ctx, new GestureListener());
-        this.swipeGestureHandler = swipeGesterHandler;
+        if(params.length >0) {
+            if(params[0] instanceof SwipeGestureHandler)
+            this.swipeGestureHandler = (SwipeGestureHandler)params[0];
+        }
+        else if(ctx instanceof SwipeGestureHandler)
+        {
+            this.swipeGestureHandler = (SwipeGestureHandler)ctx;
+        }
     }
 
     @Override
