@@ -63,4 +63,13 @@
         </LinearLayout>
 
     </LinearLayout>
+
+    <Button
+        style="?android:attr/buttonStyleSmall"
+        android:layout_width="122dp"
+        android:layout_height="73dp"
+        android:text="S"
+        android:id="@+id/savedAdsButton"
+        android:layout_gravity="bottom" />
+
 </LinearLayout>

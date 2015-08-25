@@ -4,6 +4,7 @@ import nyc2015.ydmc.com.gma.activity.helper.AdViewHolder;
 import nyc2015.ydmc.com.gma.activity.helper.MainActivitySwipeHandler;
 import nyc2015.ydmc.com.gma.ads.NativeAdFetcher;
 import nyc2015.ydmc.com.gma.constants.FlurryConstants;
+import nyc2015.ydmc.com.gma.constants.SharedPreferenceConstants;
 import nyc2015.ydmc.com.gma.data.ApplicationData;
 import nyc2015.ydmc.com.gma.input.gesture.OnSwipeTouchListener;
 import nyc2015.ydmc.com.gma.input.gesture.SwipeGestureHandler;
@@ -11,12 +12,17 @@ import nyc2015.ydmc.com.gma.util.SystemUiHider;
 
 import android.annotation.TargetApi;
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.Context;
+import android.content.DialogInterface;
+import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
+import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
@@ -30,6 +36,7 @@ import com.flurry.android.ads.FlurryAdInterstitialListener;
 import com.flurry.android.ads.FlurryAdNative;
 import com.flurry.android.ads.FlurryAdNativeAsset;
 import com.flurry.android.ads.FlurryAdNativeListener;
+import com.google.android.gms.gcm.Task;
 
 import java.util.List;
 import java.util.Timer;
@@ -57,11 +64,17 @@ public class MainActivity extends Activity implements SwipeGestureHandler {
 
     private OnSwipeTouchListener swipeGestureListener;
 
+    SharedPreferences sharedPreferences;
+
+    private List<String> savedAds;
+
     public static final String AD_ASSET_HEADLINE = "headline";
     public static final String AD_ASSET_SUMMARY = "summary";
     public static final String AD_ASSET_SOURCE = "source";
     public static final String AD_ASSET_SEC_HQ_BRANDING_LOGO = "secHqBrandingLogo";
     public static final String AD_ASSET_SEC_HQ_IMAGE = "secHqImage";
+
+    private Button button;
 
     FlurryAdNativeListener nativeListener = new FlurryAdNativeListener() {
 
@@ -122,6 +135,11 @@ public class MainActivity extends Activity implements SwipeGestureHandler {
 
         setContentView(R.layout.activity_main);
 
+        sharedPreferences = getApplicationContext().getSharedPreferences(SharedPreferenceConstants.SHARED_PREF_FILENAME, Activity.MODE_PRIVATE);
+
+        //load saved ads
+        savedAds = SharedPreferenceConstants.loadSavedAdsFromSharedPreferences(sharedPreferences);
+
         // final View controlsView = findViewById(R.id.fullscreen_content_controls);
         adLayout = (LinearLayout) findViewById(R.id.adContainerLayout);
 
@@ -129,7 +147,7 @@ public class MainActivity extends Activity implements SwipeGestureHandler {
         //when creating the native ad objects to prevent the object from
         //being destroyed with the Activity
 
-       initFlurry();
+        initFlurry();
 
         adViewHolder.setAdImage((ImageView) findViewById(R.id.mainImage));
         // adViewHolder.setAdSummary((TextView) findViewById(R.id.mainText));
@@ -237,7 +255,30 @@ public class MainActivity extends Activity implements SwipeGestureHandler {
 
     @Override
     public void swipedRight() {
-        this.adViewHolder.getAdTitle().performLongClick();//.performClick();
+        //adViewHolder.getAdSummary().performClick();//.performLongClick();//.performClick();
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle(R.string.save_overlay_title);
+        builder.setTitle(R.string.save_overlay_title);
+        this.savedAds = SharedPreferenceConstants.loadSavedAdsFromSharedPreferences(this.getSharedPreferences(SharedPreferenceConstants.SHARED_PREF_FILENAME, Activity.MODE_PRIVATE));
+        if ((this.savedAds != null) && (this.savedAds.size() > 0)) {
+            StringBuilder stringBuilder = new StringBuilder();
+            for (String tmpMessage : this.savedAds) {
+                stringBuilder.append(tmpMessage + "\n");
+            }
+            builder.setMessage(stringBuilder);
+        } else {
+            builder.setMessage("unable to get saved ads");
+        }
+        builder.setCancelable(true);
+        builder.setNeutralButton("OK", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int id) {
+                        dialog.cancel();
+                    }
+                }
+        );
+        builder.create();
+        builder.show();
     }
 
     @Override
@@ -250,11 +291,11 @@ public class MainActivity extends Activity implements SwipeGestureHandler {
 
     @Override
     public void swipedUp() {
-
-            ApplicationData.getInstance().getSavedAds().add(this.adViewHolder.getAdTitle().getText().toString());;
-            Toast.makeText(getBaseContext(), "Ad Saved " + this.adViewHolder.getAdTitle().getText().toString(), Toast.LENGTH_LONG).show();
-            this.handleAdNeedsToGo();
-
+        ApplicationData.getInstance().getSavedAds().add(this.adViewHolder.getAdTitle().getText().toString());
+        ;
+        Toast.makeText(getBaseContext(), "Ad Saved " + this.adViewHolder.getAdTitle().getText().toString(), Toast.LENGTH_LONG).show();
+        SharedPreferenceConstants.flushSharedPreferences(sharedPreferences, ApplicationData.getInstance().getSavedAds());
+        this.handleAdNeedsToGo();
     }
 
     @Override
@@ -264,8 +305,8 @@ public class MainActivity extends Activity implements SwipeGestureHandler {
         this.handleAdNeedsToGo();
     }
 
-    private void handleAdNeedsToGo()
-    {
+
+    private void handleAdNeedsToGo() {
 
         MainActivity.this.mFlurryAdNative.destroy();
         final Handler timerHandler = new Handler();
@@ -281,8 +322,8 @@ public class MainActivity extends Activity implements SwipeGestureHandler {
         timerHandler.postDelayed(timerRunnable, 2000);
     }
 
-    private void initFlurry()
-    {
+
+    private void initFlurry() {
 
         mFlurryAdNative = new FlurryAdNative(this, FlurryConstants.FLURRY_STREAM_AD_CAMPAIGN);
         // allow us to get callbacks for ad events
@@ -290,5 +331,31 @@ public class MainActivity extends Activity implements SwipeGestureHandler {
         //required to support ad tracking
         mFlurryAdNative.setTrackingView(adLayout);
     }
+
+    public void addListenerOnButton() {
+
+        button = (Button) findViewById(R.id.savedAdsButton);
+
+        button.setOnClickListener(new View.OnClickListener() {
+
+            @Override
+            public void onClick(View arg0) {
+                AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
+                builder.setTitle(R.string.save_overlay_title);
+                if ((MainActivity.this.savedAds != null) && (MainActivity.this.savedAds.size() > 0)) {
+                    StringBuilder stringBuilder = new StringBuilder();
+                    for (String tmpMessage : MainActivity.this.savedAds) {
+                        stringBuilder.append(tmpMessage + "/n");
+                    }
+                    builder.setMessage(stringBuilder);
+                } else {
+                    builder.setMessage("unable to get saved ads");
+                }
+                builder.create();
+            }
+
+        });
+    }
+
 }
 
